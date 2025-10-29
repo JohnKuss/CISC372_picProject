@@ -22,7 +22,7 @@ Matrix algorithms[]={
     {{0,0,0},{0,1,0},{0,0,0}}
 };
 
-int thread_count; //Global variable for thread count.
+//int thread_count; //Global variable for thread count.
 pthread_mutex_t lock; //Mutex lock
 
 struct args {
@@ -30,6 +30,7 @@ struct args {
 	Image* destImage;
 	Matrix* algorithm;
 	int rank;
+	int thread_count;
 };
 
 //getPixelValue - Computes the value of a specific pixel on a specific channel using the selected convolution kernel
@@ -74,6 +75,7 @@ void *convolute(void* convoluteArgs){
     Image* destImage=((struct args*)convoluteArgs)->destImage;
     Matrix *algorithm=((struct args*)convoluteArgs)->algorithm;
     int rank=((struct args*)convoluteArgs)->rank;
+    int thread_count=((struct args*)convoluteArgs)->thread_count;
     span=srcImage->bpp*srcImage->bpp;
     //Calculate how many rows each thread should handle
     int rowsPerThread=srcImage->height/thread_count;
@@ -123,7 +125,7 @@ int main(int argc,char** argv){
         printf("You have applied a gaussian filter to Gauss which has caused a tear in the time-space continum.\n");
     }
     enum KernelTypes type=GetKernelType(argv[2]);
-    thread_count=strtol(argv[3],NULL,10); //Set thread count
+    int thread_count=strtol(argv[3],NULL,10); //Set thread count
     //Initialize struct for args
     struct args *convoluteArgs=(struct args*)malloc(sizeof(struct args));
     thread_handles=(pthread_t*)malloc(thread_count*sizeof(pthread_t));
@@ -141,9 +143,8 @@ int main(int argc,char** argv){
     convoluteArgs->srcImage=&srcImage;
     convoluteArgs->destImage=&destImage;
     convoluteArgs->algorithm=&algorithms[type];
-    //convolute(&srcImage,&destImage,algorithms[type]);
-    //Init lock
-    pthread_mutex_init(&lock,NULL);
+    convoluteArgs->thread_count=thread_count;
+    pthread_mutex_init(&lock,NULL); //Init lock
     //Thread loop
     for (thread=0; thread<thread_count; thread++){
     	convoluteArgs->rank=thread;
@@ -157,7 +158,7 @@ int main(int argc,char** argv){
     free(destImage.data);
     free(thread_handles); //Free thread handles
     free(convoluteArgs); //Free args
-    pthread_mutex_destroy(&lock);
+    pthread_mutex_destroy(&lock); //destroy lock
     t2=time(NULL);
     printf("Took %ld seconds\n",t2-t1);
    return 0;
