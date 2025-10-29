@@ -2,8 +2,9 @@
 #include <stdint.h>
 #include <time.h>
 #include <string.h>
-#include "image.h"
+#include "image_pthread.h"
 #include <pthread.h>
+#include <stdlib.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
@@ -11,7 +12,6 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-//An array of kernel matrices to be used for image convolution.
 //The indexes of these match the enumeration from the header file. ie. algorithms[BLUR] returns the kernel corresponding to a box blur.
 Matrix algorithms[]={
     {{0,-1,0},{-1,4,-1},{0,-1,0}},
@@ -25,7 +25,7 @@ Matrix algorithms[]={
 int thread_count; //Global variable for thread count.
 
 struct args {
-	Image* sourceImage;
+	Image* srcImage;
 	Image* destImage;
 	Matrix algorithm;
 	int rank;
@@ -65,17 +65,17 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
 //            destImage: A pointer to a  pre-allocated (including space for the pixel array) structure to receive the convoluted image.  It should be the same size as srcImage
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
-void convolute(void* convoluteArgs){
+void *convolute(void* convoluteArgs){
     int row,pix,bit,span;
     //Create variables from struct
-    Image* srcImage=convoluteArgs->srcImage;
-    Image* destImage=convoluteArgs->destImage;
-    Matrix algorithm=convoluteArgs->algorithm;
-    int rank=convoluteArgs->rank;
+    Image* srcImage=((struct args*)convoluteArgs)->srcImage;
+    Image* destImage=((struct args*)convoluteArgs)->destImage;
+    Matrix algorithm=((struct args*)convoluteArgs)->algorithm;
+    int rank=((struct args*)convoluteArgs)->rank;
     span=srcImage->bpp*srcImage->bpp;
     //Calculate how many rows each thread should handle
     int rowsPerThread=srcImage->height/thread_count;
-    for (row=rank*rowsPerThread;row<(rank*rowsPerThread)+rowPerThread;row++){
+    for (row=rank*rowsPerThread;row<(rank*rowsPerThread)+rowsPerThread;row++){
         for (pix=0;pix<srcImage->width;pix++){
             for (bit=0;bit<srcImage->bpp;bit++){
                 destImage->data[Index(pix,row,srcImage->width,bit,srcImage->bpp)]=getPixelValue(srcImage,pix,row,bit,algorithm);
@@ -108,21 +108,19 @@ enum KernelTypes GetKernelType(char* type){
 int main(int argc,char** argv){
     long t1,t2;
     t1=time(NULL);
-    srcImage->bpp;
     //Initialize thread vars
     long thread;
     pthread_t* thread_handles;
-    stbi_set_flip_vertically_on_load(0);srcImage->bpp;
+    stbi_set_flip_vertically_on_load(0);
     if (argc!=4) return Usage();
     char* fileName=argv[1];
     if (!strcmp(argv[1],"pic4.jpg")&&!strcmp(argv[2],"gauss")){
         printf("You have applied a gaussian filter to Gauss which has caused a tear in the time-space continum.\n");
     }
     enum KernelTypes type=GetKernelType(argv[2]);
-    thread_count=strtoi(argv[3],NULL,10); //Set thread count
+    thread_count=strtol(argv[3],NULL,10); //Set thread count
     //Initialize struct for args
-    struct args convoluteArgs=(struct args*)malloc(sizeof(struct args);
-    args->
+    struct args *convoluteArgs=(struct args*)malloc(sizeof(struct args));
     thread_handles=(pthread_t*)malloc(thread_count*sizeof(pthread_t));
     Image srcImage,destImage,bwImage;
     srcImage.data=stbi_load(fileName,&srcImage.width,&srcImage.height,&srcImage.bpp,0);
@@ -142,7 +140,7 @@ int main(int argc,char** argv){
     //Thread loop
     for (thread=0; thread<thread_count; thread++){
     	convoluteArgs->rank=thread;
-    	pthread_create(&thread_handles[thread],NULL,(void*)convoluteArgs);
+    	pthread_create(&thread_handles[thread],NULL,convolute,(void*)convoluteArgs);
     }
     stbi_write_png("output.png",destImage.width,destImage.height,destImage.bpp,destImage.data,destImage.bpp*destImage.width);
     //Thread join threads
