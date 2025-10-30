@@ -26,11 +26,12 @@ struct args{
 	Image* srcImage;
 	Image* destImage;
 	Matrix* algorithm;
-	int thread_rank;
 	int thread_count;
 }; //Struct for passing in args to convolute function.
 
 pthread_mutex_t lock; //Declare mutex lock.
+
+struct args* convoluteArgs; //Global variable for struct.
 
 //getPixelValue - Computes the value of a specific pixel on a specific channel using the selected convolution kernel
 //Paramters: srcImage:  An Image struct populated with the image being convoluted
@@ -66,22 +67,29 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
 //            destImage: A pointer to a  pre-allocated (including space for the pixel array) structure to receive the convoluted image.  It should be the same size as srcImage
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
-void* convolute(void* convoluteArgs){
-    //Lock lock.
-    pthread_mutex_lock(&lock);
+void* convolute(void* thread_rank){
     int row,pix,bit,span;
 
-    //Parse variables from convoluteArgs.
+    //Lock lock.
+    pthread_mutex_lock(&lock);
+
+    //Parse variables from global convoluteArgs.
     Image* srcImage=((struct args*)convoluteArgs)->srcImage;
     Image* destImage=((struct args*)convoluteArgs)->destImage;
     Matrix *algorithm=((struct args*)convoluteArgs)->algorithm;
-    int thread_rank=((struct args*)convoluteArgs)->thread_rank;
+
+    //Unlock lock.
+    pthread_mutex_unlock(&lock);
+
+    //int thread_rank=((struct args*)convoluteArgs)->thread_rank;
     int thread_count=((struct args*)convoluteArgs)->thread_count;
 
     //Compute rowsPerThread, rowStart, and rowEnd.
     int rowsPerThread=srcImage->height/thread_count;
-    int rowStart=thread_rank*rowsPerThread;
+    int rowStart=((long)thread_rank)*rowsPerThread;
     int rowEnd=rowStart+rowsPerThread;
+
+    //printf("Thread #%ld: thread_count:%d, rowsPerThread:%d, rowStart:%d, rowEnd:%d\n",(long)thread_rank,thread_count,rowsPerThread,rowStart,rowEnd);
 
     span=srcImage->bpp*srcImage->bpp;
     for (row=rowStart;row<rowEnd;row++){
@@ -91,8 +99,6 @@ void* convolute(void* convoluteArgs){
             }
         }
     }
-    //Unlock lock.
-    pthread_mutex_unlock(&lock);
 }
 
 //Usage: Prints usage information for the program
@@ -124,7 +130,7 @@ int main(int argc,char** argv){
     long thread;
     pthread_t* thread_handles;
     int thread_count;
-    struct args* convoluteArgs;
+    //struct args* convoluteArgs;
 
     stbi_set_flip_vertically_on_load(0);
     if (argc!=4) return Usage();
@@ -161,8 +167,8 @@ int main(int argc,char** argv){
 
     //pthread_create loop.
     for(thread=0; thread<thread_count; thread++) {
-    	convoluteArgs->thread_rank=thread;
-        pthread_create(&thread_handles[thread],NULL,convolute,(void*)convoluteArgs);
+    	//printf("pthread_create loop thread #%ld",thread);
+        pthread_create(&thread_handles[thread],NULL,convolute,(void*)thread);
     }
 
     //pthread_join loop.
