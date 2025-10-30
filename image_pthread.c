@@ -30,6 +30,8 @@ struct args{
 	int thread_count;
 }; //Struct for passing in args to convolute function.
 
+pthread_mutex_t lock; //Declare mutex lock.
+
 //getPixelValue - Computes the value of a specific pixel on a specific channel using the selected convolution kernel
 //Paramters: srcImage:  An Image struct populated with the image being convoluted
 //           x: The x coordinate of the pixel
@@ -65,11 +67,11 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
 void* convolute(void* convoluteArgs){
-    /*long t1, t2;
-    t1=time(NULL);*/
+    //Lock lock.
+    pthread_mutex_lock(&lock);
     int row,pix,bit,span;
 
-    //Parse variables from convoluteArgs
+    //Parse variables from convoluteArgs.
     Image* srcImage=((struct args*)convoluteArgs)->srcImage;
     Image* destImage=((struct args*)convoluteArgs)->destImage;
     Matrix *algorithm=((struct args*)convoluteArgs)->algorithm;
@@ -89,8 +91,8 @@ void* convolute(void* convoluteArgs){
             }
         }
     }
-    /*t2=time(NULL);
-    printf("Time taken in convolute: %ld\n",t2-t1);*/
+    //Unlock lock.
+    pthread_mutex_unlock(&lock);
 }
 
 //Usage: Prints usage information for the program
@@ -132,7 +134,7 @@ int main(int argc,char** argv){
     }
     enum KernelTypes type=GetKernelType(argv[2]);
 
-    //Parse thread_count, and allocate space for thread_handles args struct.
+    //Parse thread_count, and allocate space for thread_handles and args struct.
     thread_count=strtol(argv[3],NULL,10);
     thread_handles=(pthread_t*)malloc(thread_count*sizeof(pthread_t));
     convoluteArgs=(struct args*)malloc(sizeof(struct args));
@@ -154,18 +156,20 @@ int main(int argc,char** argv){
     convoluteArgs->algorithm=&algorithms[type];
     convoluteArgs->thread_count=thread_count;
 
+    //Initialize lock.
+    pthread_mutex_init(&lock,NULL);
+
     //pthread_create loop.
     for(thread=0; thread<thread_count; thread++) {
     	convoluteArgs->thread_rank=thread;
         pthread_create(&thread_handles[thread],NULL,convolute,(void*)convoluteArgs);
     }
 
-    //pthread_join loop
+    //pthread_join loop.
     for(thread=0; thread<thread_count; thread++){
     	pthread_join(thread_handles[thread],NULL);
     }
 
-    //convolute(&srcImage,&destImage,algorithms[type]);
     stbi_write_png("output.png",destImage.width,destImage.height,destImage.bpp,destImage.data,destImage.bpp*destImage.width);
     stbi_image_free(srcImage.data);
 
@@ -175,6 +179,9 @@ int main(int argc,char** argv){
     //Free what needs to be freed.
     free(thread_handles);
     free(convoluteArgs);
+
+    //Destroy lock.
+    pthread_mutex_destroy(&lock);
 
     printf("Took %ld seconds\n",t2-t1);
    return 0;
