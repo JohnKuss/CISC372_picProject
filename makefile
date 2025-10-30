@@ -5,5 +5,5 @@ clean:
 	rm -f image output.png image_pthread image_openmp
 image_pthread: image_pthread.c image_pthread.h
 	gcc -g image_pthread.c -o image_pthread -lpthread -lm
-image_openmp: image_openmp.c image.h
+image_openmp: image_openmp.c image_openmp.h
 	gcc -fopenmp image_openmp.c -o image_openmp -lm
