@@ -6,4 +6,4 @@ clean:
 image_pthread: image_pthread.c image_pthread.h
 	gcc -g image_pthread.c -o image_pthread -lpthread -lm
 image_openmp: image_openmp.c image.h
-	gcc -g -Wall -fopenmp -o image_openmp image_openmp.c -lm
+	gcc -fopenmp image_openmp.c -o image_openmp -lm
