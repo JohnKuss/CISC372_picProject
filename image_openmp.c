@@ -60,21 +60,10 @@ uint8_t getPixelValue(Image* srcImage,int x,int y,int bit,Matrix algorithm){
 //            algorithm: The kernel matrix to use for the convolution
 //Returns: Nothing
 void convolute(Image* srcImage,Image* destImage,Matrix algorithm, int thread_count){
+    long t1,t2;
+    t1=time(NULL);
     int row,pix,bit,span;
     span=srcImage->bpp*srcImage->bpp;
-    /*#ifdef _OPENMP
-    int my_rank=omp_get_thread_num();
-    int thread_count=omp_get_num_threads();
-    #else
-    int my_rank=0;
-    int thread_count=1;
-    #endif*/
-    //printf("We have %d threads\n",thread_count);
-    /*int rowsPerThread=srcImage->height/thread_count;
-    int rowStart=my_rank*rowsPerThread;
-    int rowEnd=rowStart+rowsPerThread;*/
-    //printf("Thread %d: rowsPerThread: %d, rowStart:%d, rowEnd%d\n",my_rank,rowsPerThread,rowStart,rowEnd);
-    //#pragma omp parallel
     #pragma omp parallel for private(row,pix,bit) num_threads(thread_count)
     for (row=0;row<srcImage->height;row++){
         for (pix=0;pix<srcImage->width;pix++){
@@ -83,6 +72,8 @@ void convolute(Image* srcImage,Image* destImage,Matrix algorithm, int thread_cou
             }
         }
     }
+    t2=time(NULL);
+    printf("Time taken in convolute:%ld\n",t2-t1);
 }
 
 //Usage: Prints usage information for the program
@@ -130,7 +121,6 @@ int main(int argc,char** argv){
     destImage.height=srcImage.height;
     destImage.width=srcImage.width;
     destImage.data=malloc(sizeof(uint8_t)*destImage.width*destImage.bpp*destImage.height);
-    //#pragma omp parallel num_threads(thread_count)
     convolute(&srcImage,&destImage,algorithms[type],thread_count);
     stbi_write_png("output.png",destImage.width,destImage.height,destImage.bpp,destImage.data,destImage.bpp*destImage.width);
     stbi_image_free(srcImage.data);
